@@ -3,6 +3,7 @@ package controllers
 import (
 	"backend/config"
 	"backend/models"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -91,16 +92,22 @@ func Login(c *gin.Context) {
 }
 
 // Middleware para validar token
+// Middleware para validar token y extraer datos del usuario
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokenString := c.GetHeader("Authorization")
+		authHeader := c.GetHeader("Authorization")
 
-		if tokenString == "" {
+		if authHeader == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token requerido"})
 			c.Abort()
 			return
 		}
 
+		// Validar que el token tenga formato Bearer <token>
+		var tokenString string
+		fmt.Sscanf(authHeader, "Bearer %s", &tokenString)
+
+		// Parsear el token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			return []byte(config.JWTSecret), nil
 		})
@@ -109,6 +116,13 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			c.Abort()
 			return
+		}
+
+		// Extraer claims (info del token) y poner user_id en el contexto
+		if claims, ok := token.Claims.(jwt.MapClaims); ok {
+			if userID, ok := claims["user_id"]; ok {
+				c.Set("user_id", userID)
+			}
 		}
 
 		c.Next()
