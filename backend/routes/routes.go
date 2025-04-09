@@ -6,30 +6,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRoutes configura todas las rutas del backend
 func SetupRoutes(r *gin.Engine) {
-	// 🔐 Autenticación
+	// 🔐 Rutas públicas de autenticación
 	authRoutes := r.Group("/api/auth")
 	{
 		authRoutes.POST("/register", controllers.Register)
 		authRoutes.POST("/login", controllers.Login)
 	}
 
-	// 🧾 Logs de actividad
+	// 🧾 Rutas públicas de logs
 	logRoutes := r.Group("/api/logs")
 	{
 		logRoutes.GET("/", controllers.GetLogs)
-		// logRoutes.GET("/:id", controllers.GetActivityLogByID)
-		logRoutes.POST("/", controllers.CreateLog) // solo si permites logs manuales
-		// logRoutes.DELETE("/:id", controllers.DeleteActivityLog)
+		logRoutes.POST("/", controllers.CreateLog)
 	}
 
-	// 🧪 Ruta de prueba protegida
+	// 🧪 Ruta de prueba
 	r.GET("/api/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "Servidor activo 🔥"})
 	})
 
-	// ✅ Rutas protegidas con autenticación
+	// ✅ Rutas protegidas (requieren token)
 	protected := r.Group("/api")
 	protected.Use(controllers.AuthMiddleware())
 	{
@@ -71,6 +68,13 @@ func SetupRoutes(r *gin.Engine) {
 			paymentRoutes.POST("/", controllers.CreatePayment)
 			paymentRoutes.PUT("/:id", controllers.UpdatePayment)
 			paymentRoutes.DELETE("/:id", controllers.DeletePayment)
+		}
+
+		// 🔐 Perfil del usuario logueado
+		authProtected := protected.Group("/auth")
+		{
+			authProtected.GET("/me", controllers.GetMyProfile)
+			authProtected.PUT("/update-profile", controllers.UpdateMyProfile) // ✅ nueva ruta
 		}
 	}
 }

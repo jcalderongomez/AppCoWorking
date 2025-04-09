@@ -127,4 +127,65 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+
+}
+func GetMyProfile(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+
+	var user models.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+		return
+	}
+
+	c.JSON(http.StatusOK, user)
+}
+
+
+// Actualizar perfil del usuario logueado
+func UpdateMyProfile(c *gin.Context) {
+	userID, _ := c.Get("user_id")
+
+	var input struct {
+		Nombre        string `json:"nombre"`
+		Password      string `json:"password"`
+		NuevaPassword string `json:"nueva_password"`
+	}
+
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos"})
+		return
+	}
+
+	var user models.User
+	if err := config.DB.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Usuario no encontrado"})
+		return
+	}
+
+	// Validar la contraseña actual si quiere cambiarla
+	if input.NuevaPassword != "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Contraseña actual incorrecta"})
+			return
+		}
+		hashedPass, _ := bcrypt.GenerateFromPassword([]byte(input.NuevaPassword), bcrypt.DefaultCost)
+		user.Password = string(hashedPass)
+	}
+
+	// Actualizar el nombre si se proporciona
+	if input.Nombre != "" {
+		user.Nombre = input.Nombre
+	}
+
+	// Guardar cambios
+	if err := config.DB.Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al actualizar el perfil"})
+		return
+	}
+
+	// Log de actividad
+	CreateActivityLog(user.ID, "actualización de perfil", "Usuario actualizó su perfil")
+
+	c.JSON(http.StatusOK, gin.H{"message": "Perfil actualizado con éxito"})
 }
